@@ -1,0 +1,15 @@
+{
+  "name": "LiquidCrystalCyr",
+  "keywords": "LCD, liquidcrystal, cyr",
+  "description": "A library for DFRobot LCD displays",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/apaex/LiquidCrystalCyr.git"
+  },
+  "frameworks": "arduino",
+  "platforms":
+  [
+    "atmelavr"
+  ]
+}
