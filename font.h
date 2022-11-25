@@ -1,5 +1,7 @@
 #pragma once
 
+// Б Г Д Ж И Й Л П У Ф Ц Ч Ш Щ Ъ Ы Ь Э Ю Я б г д ж и й л п у ф ц ч ш щ ъ ы э ю я в з к н т
+
 const byte font[][8] PROGMEM = {
   //Б
   {
@@ -222,7 +224,7 @@ const byte font[][8] PROGMEM = {
     0b00000,
   },
 
-
+#ifdef INCLUDE_LOWERCASE
   //б
   {
     0b00100,
@@ -488,10 +490,13 @@ const byte font[][8] PROGMEM = {
     0b00100,
     0b00000,
   },
-
+#endif
 };
 
 const byte FONT_CHAR_COUNT = sizeof(font) / sizeof(font[0]);
 
 const unsigned char char_map[] = { 'A', 0, 'B', 1, 2, 'E', 3, '3', 4, 5, 'K', 6, 'M', 'H', 'O', 7, 'P', 'C', 'T', 8, 9, 'X', 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-                                   'a', 20, 39, 21, 22, 'e', 23, 40, 24, 25, 41, 26, 'm', 42, 'o', 27, 'p', 'c', 43, 28, 29, 'x', 30, 31, 32, 33, 34, 35, 'b', 36, 37, 38 };
+#ifdef INCLUDE_LOWERCASE
+                                   'a', 20, 39, 21, 22, 'e', 23, 40, 24, 25, 41, 26, 'm', 42, 'o', 27, 'p', 'c', 43, 28, 29, 'x', 30, 31, 32, 33, 34, 35, 'b', 36, 37, 38 
+#endif                                   
+                                  };

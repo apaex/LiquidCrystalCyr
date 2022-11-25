@@ -1,12 +1,14 @@
 #pragma once
 
 #include <LiquidCrystal.h>
+//#define INCLUDE_LOWERCASE 
 #include "font.h"
+
 
 #define GEN_COUNT (FONT_CHAR_COUNT+8)   // ещё на 8 пользовательских символов храним номер генератора
 
 
-void pgm_read_8byte(byte* data, void *buf)
+void pgm_read_8byte(const byte* data, void *buf)
 {
   uint32_t *buf_ = buf;
 
@@ -35,6 +37,8 @@ public:
 
     void begin(uint8_t cols, uint8_t rows)
     {
+      memset(_gen, 0, GEN_COUNT);
+
       nCols = cols;
       nRows = rows;
       LiquidCrystal::begin(cols, rows, LCD_5x8DOTS);
@@ -58,23 +62,26 @@ public:
 
     void createChar(uint8_t location, uint8_t charmap[])
     {
-      customChars_[location] = charmap;       // изменено стандартное поведение  - передаваемый массив символа должен существовать постоянно
+        customChars_[location] = charmap;       // изменено стандартное поведение  - передаваемый массив символа должен существовать постоянно
     }
 
     virtual size_t write(uint8_t c)
     {
-        if (c >= 0 && c <= 0x07)
+        if (!_CGRAM_write)
         {
-          c = createUserChar(c);
+            if (c >= 0 && c <= 0x07)
+            {
+                c = createUserChar(c);
+            }
+            else if (c >= 0xc0 && c <= 0xff)
+            {
+                c = char_map[c - 0xc0];
+                if (c < FONT_CHAR_COUNT)
+                    c = createFontChar(c);
+            }
+            ++_col;
         }
-        else if (c >= 0xc0 && c <= 0xff)
-        {
-            c = char_map[c - 0xc0];
-            if (c < FONT_CHAR_COUNT)
-                c = createFontChar(c);
-        }
-        LiquidCrystal::write((byte)c);
-        ++_col;
+        LiquidCrystal::write((byte)c);        
     }
 
     void printf(const char *format, ...)
@@ -118,13 +125,13 @@ public:
 private:
     byte _row = 0;
     byte _col = 0;
+    
+    bool _CGRAM_write = 0;
 
     byte _query[8] = {8, 7, 6, 5, 4, 3, 2, 1};
     
     // массив хранит номер знакоместа LCD, куда загружен знакогенератор символа (0..7)
-    byte _gen[GEN_COUNT] = {0, 0, 0, 0, 0, 0, 0, 0,                                     // сначала пользовательские символы
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    byte _gen[GEN_COUNT];
 
     // отдаст свободное или освобождаемое знакоместо дисплея
     byte get_char_cell(byte lcd_c)
@@ -159,10 +166,11 @@ private:
 
             byte buf[8];
             pgm_read_8byte(font[c], buf);
+            _CGRAM_write = true;
             LiquidCrystal::createChar(lcd_c - 1, buf);
-            _col -= 8;      // т.к. внутри createChar тоже вызовется Write и указатель шагнет
+            _CGRAM_write = false;
             LiquidCrystal::setCursor(_col, _row);
-            
+            DebugWrite(); 
         }
 
         return _gen[c+8] - 1;
@@ -183,11 +191,24 @@ private:
                     _gen[i] = 0;
             _gen[c] = lcd_c;
 
+            _CGRAM_write = true;
             LiquidCrystal::createChar(lcd_c - 1, customChars_[c]);
-            _col -= 8;      // т.к. внутри createChar тоже вызовется Write и указатель шагнет
-            LiquidCrystal::setCursor(_col, _row);            
+            _CGRAM_write = false;
+            LiquidCrystal::setCursor(_col, _row);       
+            DebugWrite();     
         }
 
         return _gen[c] - 1;
+    }
+
+    void DebugWrite()
+    {
+#ifdef DEBUG
+        for (int i=0; i< GEN_COUNT; ++i) {
+            Serial.print(_gen[i]);
+            Serial.print(',');
+        }
+        Serial.println("");
+#endif
     }
 };
