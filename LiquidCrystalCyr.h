@@ -3,6 +3,18 @@
 #include <LiquidCrystal.h>
 #include "font.h"
 
+#define GEN_COUNT (FONT_CHAR_COUNT+8)   // ещё на 8 пользовательских символов храним номер генератора
+
+
+void pgm_read_8byte(byte* data, void *buf)
+{
+  uint32_t *buf_ = buf;
+
+  buf_[0] = pgm_read_dword(data+0);
+  buf_[1] = pgm_read_dword(data+4);
+}
+
+
 class LiquidCrystalCyr : public LiquidCrystal
 {
 
@@ -41,17 +53,28 @@ public:
         _row = row;
         return LiquidCrystal::setCursor(col, row);
     }
+    
+    byte *customChars_[8] = {NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+
+    void createChar(uint8_t location, uint8_t charmap[])
+    {
+      customChars_[location] = charmap;       // изменено стандартное поведение  - передаваемый массив символа должен существовать постоянно
+    }
 
     virtual size_t write(uint8_t c)
     {
-        if (c >= 0xc0 && c <= 0xff)
+        if (c >= 0 && c <= 0x07)
         {
-            c = char_map[c - 192];
+          c = createUserChar(c);
+        }
+        else if (c >= 0xc0 && c <= 0xff)
+        {
+            c = char_map[c - 0xc0];
             if (c < FONT_CHAR_COUNT)
-                c = createChar_(c);
+                c = createFontChar(c);
         }
         LiquidCrystal::write((byte)c);
-        ++_row;
+        ++_col;
     }
 
     void printf(const char *format, ...)
@@ -95,9 +118,15 @@ public:
 private:
     byte _row = 0;
     byte _col = 0;
-    byte _query[8] = {8, 7, 6, 5, 4, 3, 2, 1};
-    byte _gen[FONT_CHAR_COUNT] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
+    byte _query[8] = {8, 7, 6, 5, 4, 3, 2, 1};
+    
+    // массив хранит номер знакоместа LCD, куда загружен знакогенератор символа (0..7)
+    byte _gen[GEN_COUNT] = {0, 0, 0, 0, 0, 0, 0, 0,                                     // сначала пользовательские символы
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    // отдаст свободное или освобождаемое знакоместо дисплея
     byte get_char_cell(byte lcd_c)
     {
         byte i = 0;
@@ -117,30 +146,46 @@ private:
         return r;
     }
 
-    void pgm_read_8byte(byte* data, void *buf)
+    byte createFontChar(byte c)
     {
-      uint32_t *buf_ = buf;
+        byte lcd_c = get_char_cell(_gen[c+8]);
 
-      buf_[0] = pgm_read_dword(data+0);
-      buf_[1] = pgm_read_dword(data+4);
+        if (!_gen[c+8])
+        {
+            for (byte i = 0; i < GEN_COUNT; ++i)
+                if (_gen[i] == lcd_c)
+                    _gen[i] = 0;
+            _gen[c+8] = lcd_c;
+
+            byte buf[8];
+            pgm_read_8byte(font[c], buf);
+            LiquidCrystal::createChar(lcd_c - 1, buf);
+            _col -= 8;      // т.к. внутри createChar тоже вызовется Write и указатель шагнет
+            LiquidCrystal::setCursor(_col, _row);
+            
+        }
+
+        return _gen[c+8] - 1;
     }
 
-    byte createChar_(byte c)
+
+    byte createUserChar(byte c)
     {
+        if (!customChars_[c])
+          return;
+
         byte lcd_c = get_char_cell(_gen[c]);
 
         if (!_gen[c])
         {
-            for (byte i = 0; i < FONT_CHAR_COUNT; ++i)
+            for (byte i = 0; i < GEN_COUNT; ++i)
                 if (_gen[i] == lcd_c)
                     _gen[i] = 0;
             _gen[c] = lcd_c;
 
-            byte buf[8];
-            pgm_read_8byte(font[c], buf);
-            this->createChar(lcd_c - 1, buf);   //  не будет работать, надо PROGMEM
-            _row -= 8;
-            LiquidCrystal::setCursor(_row, _col);
+            LiquidCrystal::createChar(lcd_c - 1, customChars_[c]);
+            _col -= 8;      // т.к. внутри createChar тоже вызовется Write и указатель шагнет
+            LiquidCrystal::setCursor(_col, _row);            
         }
 
         return _gen[c] - 1;
